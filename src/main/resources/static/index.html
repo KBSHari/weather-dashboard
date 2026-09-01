@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Weather Dashboard (Demo)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin: 24px; }
+    input, button { padding: 8px; margin: 4px 0; }
+    .location { cursor: pointer; padding: 6px; border: 1px solid #ddd; margin: 4px 0; }
+    .location:hover { background: #f6f6f6; }
+    .card { border: 1px solid #eee; padding: 12px; margin-top: 12px; max-width: 420px; }
+  </style>
+</head>
+<body>
+  <h1>Weather Dashboard (Demo)</h1>
+
+  <label for="q">Search location (city name):</label><br/>
+  <input id="q" placeholder="e.g., London or New York" size="32" />
+  <button id="searchBtn">Search</button>
+
+  <div id="results"></div>
+
+  <div id="weather" class="card" style="display:none;">
+    <h3 id="place"></h3>
+    <div id="weatherContent"></div>
+  </div>
+
+<script>
+const resultsEl = document.getElementById('results');
+const weatherEl = document.getElementById('weather');
+const weatherContent = document.getElementById('weatherContent');
+const placeEl = document.getElementById('place');
+
+document.getElementById('searchBtn').addEventListener('click', doSearch);
+document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+function doSearch() {
+  const q = document.getElementById('q').value.trim();
+  if (!q) return;
+  resultsEl.innerHTML = 'Searching...';
+  fetch('/api/geocode?query=' + encodeURIComponent(q))
+    .then(r => r.json())
+    .then(data => {
+      resultsEl.innerHTML = '';
+      if (!data || !data.results || data.results.length === 0) {
+        resultsEl.innerHTML = '<p>No locations found.</p>';
+        return;
+      }
+      data.results.slice(0,10).forEach(loc => {
+        const div = document.createElement('div');
+        div.className = 'location';
+        div.textContent = loc.name + (loc.admin1 ? ', ' + loc.admin1 : '') + (loc.country ? ' - ' + loc.country : '')
+          + ` (lat:${loc.latitude.toFixed(3)}, lon:${loc.longitude.toFixed(3)})`;
+        div.onclick = () => fetchWeather(loc);
+        resultsEl.appendChild(div);
+      });
+    })
+    .catch(err => { resultsEl.innerHTML = 'Error: ' + err; console.error(err); });
+}
+
+function fetchWeather(loc) {
+  placeEl.textContent = loc.name + (loc.admin1 ? ', ' + loc.admin1 : '') + (loc.country ? ' - ' + loc.country : '');
+  weatherContent.innerHTML = 'Loading...';
+  weatherEl.style.display = 'block';
+  fetch(`/api/weather?lat=${loc.latitude}&lon=${loc.longitude}`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data || !data.current_weather) {
+        weatherContent.innerHTML = '<p>No current weather available.</p>';
+        return;
+      }
+      const cw = data.current_weather;
+      weatherContent.innerHTML = `
+        <strong>Temperature:</strong> ${cw.temperature} °C<br/>
+        <strong>Wind speed:</strong> ${cw.windspeed} m/s<br/>
+        <strong>Wind direction:</strong> ${cw.winddirection}°<br/>
+        <strong>Weather code:</strong> ${cw.weathercode} (see Open‑Meteo codes)<br/>
+        <small>Last update: ${cw.time}</small>
+      `;
+    })
+    .catch(err => { weatherContent.innerHTML = 'Error: ' + err; console.error(err); });
+}
+</script>
+</body>
+</html>
